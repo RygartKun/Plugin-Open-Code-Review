@@ -215,6 +215,9 @@ ocr config set custom_providers.my-gateway.model gpt-4o
 | 键 | 描述 |
 |----|------|
 | `providers.<name>.auth_header` | 认证头：`x-api-key` 或 `authorization`（默认 `authorization`） |
+| `providers.<name>.top_p` | Nucleus 采样参数 (0.0–1.0) |
+| `providers.<name>.top_k` | Top-K 采样参数（非负整数） |
+| `providers.<name>.temperature` | 温度参数 (0.0–2.0) |
 | `providers.<name>.extra_body` | 合并到请求体的自定义 JSON 字段 |
 | `providers.<name>.extra_headers` | 逗号分隔的 `key=value` 键值对，为每个请求添加自定义 HTTP 头 |
 | `providers.<name>.models` | 用于交互式选择的模型列表 |
@@ -451,6 +454,9 @@ ocr review \
 | `--audience` | — | `human` | `human`（显示进度）或 `agent`（仅输出摘要） |
 | `--background` | `-b` | — | 可选的需求/业务背景信息；使用 `--commit` 时如未指定则自动从 commit message 中提取 |
 | `--model` | — | — | 为本次审查选择或覆盖 LLM 模型 |
+| `--top-p` | — | 0 | Nucleus 采样参数 top_p（0 = 使用供应商配置默认值） |
+| `--top-k` | — | 0 | Top-K 采样参数（0 = 使用供应商配置默认值） |
+| `--temperature` | — | 0 | 温度参数（0 = 使用供应商配置默认值） |
 | `--rule` | — | — | 自定义 JSON 审查规则路径 |
 | `--max-tools` | — | 内置默认 | 每个文件的最大工具调用轮次；仅在大于模板默认值时生效 |
 | `--max-git-procs` | — | 内置默认 | 最大并发 git 子进程数 |
@@ -472,6 +478,9 @@ ocr review \
 | `--batch` | — | `by-language` | 批处理策略：`none`、`by-language` 或 `by-directory` |
 | `--format` | `-f` | `text` | 输出格式：`text` 或 `json`（JSON 包含 `project_summary` 字段） |
 | `--concurrency` | — | `8` | 最大并发文件扫描数 |
+| `--top-p` | — | 0 | Nucleus 采样参数 top_p（0 = 使用供应商配置默认值） |
+| `--top-k` | — | 0 | Top-K 采样参数（0 = 使用供应商配置默认值） |
+| `--temperature` | — | 0 | 温度参数（0 = 使用供应商配置默认值） |
 | `--rule` | — | — | 自定义 JSON 审查规则路径 |
 | `--repo` | — | 当前目录 | 要扫描的仓库或目录根路径 |
 
@@ -504,6 +513,10 @@ ocr review --commit abc123 --format json --audience agent
 # 为本次审查选择或覆盖模型
 ocr review --model claude-opus-4-6
 ocr review --commit abc123 --model claude-sonnet-4-6
+
+# 修改模型采样参数
+ocr review --top-p 0.9 --temperature 0.3
+ocr scan  --top-p 0.95 --top-k 50 --temperature 0.5
 
 # 提供需求背景以获得更有针对性的审查
 ocr review --background "为登录 API 添加限流"
@@ -665,6 +678,9 @@ OCR 通过四层优先级链解析评审规则。每层采用首次匹配原则�
 | `providers.<name>.model` | string | 供应商模型名称 |
 | `providers.<name>.models` | array | 用于交互式选择的可选供应商模型列表 |
 | `providers.<name>.auth_header` | string | `x-api-key` \| `authorization` |
+| `providers.<name>.top_p` | float | Nucleus 采样参数 (0.0–1.0) |
+| `providers.<name>.top_k` | integer | Top-K 采样参数（非负整数） |
+| `providers.<name>.temperature` | float | 温度参数 (0.0–2.0) |
 | `providers.<name>.extra_body` | object | 合并到每个请求体的 JSON 对象 |
 | `providers.<name>.timeout_sec` | integer | 每次请求的 HTTP 超时时间（秒），默认 `300` |
 | `providers.<name>.extra_headers` | string | 逗号分隔的 `key=value` HTTP 头 |
