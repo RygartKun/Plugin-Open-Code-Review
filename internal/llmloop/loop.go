@@ -147,6 +147,13 @@ func (r *Runner) CollectPendingComments() []model.LlmComment {
 // are aggregated on the Runner across all files. The returned bool is true
 // only when the model explicitly calls task_done.
 func (r *Runner) RunPerFile(ctx context.Context, messages []llm.Message, newPath string) (bool, error) {
+	// Every round of this loop re-sends the growing conversation, so each
+	// request is a prefix extension of the previous one — exactly what
+	// provider prompt caches reuse. Scope the affinity key to this file's
+	// main-task conversation so every round routes to the same cache node.
+	ctx = llm.ContextWithSessionKey(ctx,
+		llm.SessionTaskKey(r.deps.Session.SessionID, string(session.MainTask), newPath))
+
 	toolReqCount := r.deps.Template.MaxToolRequestTimes
 	const maxConsecutiveEmptyRounds = 3
 	consecutiveEmptyRounds := 0
@@ -353,7 +360,9 @@ func (r *Runner) executeToolCall(ctx context.Context, newPath string, call llm.T
 				if d != nil {
 					if !diff.ResolveComment(cm, d) && r.deps.Template.ReLocationTask != nil {
 						rlStart := time.Now()
-						_, resp, msgs := diff.ReLocateComment(rctx, cm, d, r.deps.LLMClient, r.deps.Template.ReLocationTask, r.deps.Model, r.deps.Template.MaxTokens)
+						rlCtx := llm.ContextWithSessionKey(rctx,
+							llm.SessionTaskKey(r.deps.Session.SessionID, string(session.ReLocationTask), cm.Path))
+						_, resp, msgs := diff.ReLocateComment(rlCtx, cm, d, r.deps.LLMClient, r.deps.Template.ReLocationTask, r.deps.Model, r.deps.Template.MaxTokens)
 						if msgs != nil {
 							fs := r.deps.Session.GetOrCreateFileSession(cm.Path)
 							rlRec := fs.AppendTaskRecord(session.ReLocationTask, msgs)

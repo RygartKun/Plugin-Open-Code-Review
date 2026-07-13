@@ -15,9 +15,12 @@ import (
 type fakeClient struct {
 	responses []*llm.ChatResponse
 	calls     int
+	// sessionKeys records llm.SessionKeyFromContext for each call.
+	sessionKeys []string
 }
 
-func (f *fakeClient) CompletionsWithCtx(_ context.Context, _ llm.ChatRequest) (*llm.ChatResponse, error) {
+func (f *fakeClient) CompletionsWithCtx(ctx context.Context, _ llm.ChatRequest) (*llm.ChatResponse, error) {
+	f.sessionKeys = append(f.sessionKeys, llm.SessionKeyFromContext(ctx))
 	if f.calls >= len(f.responses) {
 		content := ""
 		return &llm.ChatResponse{
@@ -115,6 +118,30 @@ func TestRunPerFile_TaskDoneImmediately(t *testing.T) {
 	}
 	if runner.TotalOutputTokens() != 5 {
 		t.Errorf("TotalOutputTokens = %d, want 5", runner.TotalOutputTokens())
+	}
+}
+
+func TestRunPerFile_TagsRequestsWithTaskSessionKey(t *testing.T) {
+	client := &fakeClient{responses: []*llm.ChatResponse{
+		fileReadToolCallResponse("call_1", `{"path":"main.go"}`),
+		taskDoneResponse(),
+	}}
+	deps := newTestDeps(client)
+	runner := NewRunner(deps)
+
+	msgs := []llm.Message{llm.NewTextMessage("user", "review this file")}
+	if _, err := runner.RunPerFile(context.Background(), msgs, "main.go"); err != nil {
+		t.Fatalf("RunPerFile: %v", err)
+	}
+
+	want := llm.SessionTaskKey(deps.Session.SessionID, string(session.MainTask), "main.go")
+	if len(client.sessionKeys) != 2 {
+		t.Fatalf("expected 2 recorded session keys, got %d", len(client.sessionKeys))
+	}
+	for i, got := range client.sessionKeys {
+		if got != want {
+			t.Errorf("call %d session key = %q, want %q", i, got, want)
+		}
 	}
 }
 
