@@ -3,10 +3,88 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestHeaderTransport(t *testing.T) {
+	headers := map[string]string{
+		"Authorization": "Bearer test-token",
+		"X-Custom":      "custom-value",
+	}
+	transport := &headerTransport{
+		base:       http.DefaultTransport,
+		headers:    headers,
+		serverName: "test-server",
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
+			t.Errorf("Authorization = %q, want %q", got, "Bearer test-token")
+		}
+		if got := r.Header.Get("X-Custom"); got != "custom-value" {
+			t.Errorf("X-Custom = %q, want %q", got, "custom-value")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	client := &http.Client{Transport: transport}
+	resp, err := client.Get(ts.URL)
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+}
+
+func TestHeaderTransport_401(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	transport := &headerTransport{
+		base:       http.DefaultTransport,
+		headers:    map[string]string{"Authorization": "Bearer bad-token"},
+		serverName: "auth-server",
+	}
+	client := &http.Client{Transport: transport}
+	_, err := client.Get(ts.URL)
+	if err == nil {
+		t.Fatal("expected error for 401, got nil")
+	}
+	if got := err.Error(); !strings.Contains(got, "401 Unauthorized") || !strings.Contains(got, "auth-server") {
+		t.Errorf("error = %q, want mention of 401 and server name", got)
+	}
+}
+
+func TestHeaderTransport_403(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer ts.Close()
+
+	transport := &headerTransport{
+		base:       http.DefaultTransport,
+		headers:    map[string]string{"Authorization": "Bearer limited-token"},
+		serverName: "perm-server",
+	}
+	client := &http.Client{Transport: transport}
+	_, err := client.Get(ts.URL)
+	if err == nil {
+		t.Fatal("expected error for 403, got nil")
+	}
+	if got := err.Error(); !strings.Contains(got, "403 Forbidden") || !strings.Contains(got, "perm-server") {
+		t.Errorf("error = %q, want mention of 403 and server name", got)
+	}
+}
 
 func TestContentToText_SingleText(t *testing.T) {
 	contents := []mcp.Content{
