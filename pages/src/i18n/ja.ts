@@ -17,6 +17,9 @@ export const ja: TranslationKeys = {
   'hero.terminal': 'ターミナル',
   'hero.copied': 'コピーしました',
   'hero.copyFailed': 'コピー失敗',
+  'hero.installNpm': 'Npm ダウンロード',
+  'hero.installUnix': 'macOS / Linux',
+  'hero.installWindows': 'Windows PowerShell',
 
   // Highlights
   'highlights.stat1Value': '20K+',
