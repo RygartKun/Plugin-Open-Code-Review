@@ -1,14 +1,47 @@
 const path = require('path');
+const zlib = require('zlib');
+const CompressionPlugin = require('compression-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
+const isProduction = process.env.NODE_ENV === 'production';
 
 module.exports = {
-  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+  mode: isProduction ? 'production' : 'development',
   entry: './src/index.tsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js',
-    publicPath: '/'
+    filename: '[name].[contenthash:8].bundle.js',
+    chunkFilename: '[name].[contenthash:8].chunk.js',
+    publicPath: '/',
+    clean: true
+  },
+  optimization: {
+    runtimeChunk: 'single',
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        react: {
+          test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/,
+          name: 'react',
+          priority: 30,
+          enforce: true
+        },
+        three: {
+          test: /[\\/]node_modules[\\/]three[\\/]/,
+          name: 'three',
+          chunks: 'async',
+          priority: 20,
+          enforce: true
+        },
+        mermaid: {
+          test: /[\\/]node_modules[\\/]mermaid[\\/]/,
+          name: 'mermaid',
+          chunks: 'async',
+          priority: 20,
+          enforce: true
+        }
+      }
+    }
   },
   module: {
     rules: [
@@ -19,7 +52,7 @@ module.exports = {
           loader: 'babel-loader',
           options: {
             presets: [
-              ['@babel/preset-react', { development: process.env.NODE_ENV !== 'production' }],
+              ['@babel/preset-react', { development: !isProduction }],
               '@babel/preset-env',
               '@babel/preset-typescript'
             ]
@@ -76,6 +109,27 @@ module.exports = {
       patterns: [
         { from: 'public', to: '.', noErrorOnMissing: true }
       ]
-    })
+    }),
+    ...(isProduction ? [
+      new CompressionPlugin({
+        filename: '[path][base].gz',
+        algorithm: 'gzip',
+        test: /\.(js|css|html|svg)$/i,
+        threshold: 10240,
+        minRatio: 0.8
+      }),
+      new CompressionPlugin({
+        filename: '[path][base].br',
+        algorithm: 'brotliCompress',
+        compressionOptions: {
+          params: {
+            [zlib.constants.BROTLI_PARAM_QUALITY]: 11
+          }
+        },
+        test: /\.(js|css|html|svg)$/i,
+        threshold: 10240,
+        minRatio: 0.8
+      })
+    ] : [])
   ]
 };
